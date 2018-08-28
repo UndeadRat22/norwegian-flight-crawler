@@ -44,70 +44,47 @@ def download_html(url):
     resp = requests.get(url)
     return resp.content.decode("UTF-8")
 
-counter = 0
-def query_html_data(pyquery, qfilters):
-    for f in qfilters:
-        pyquery = pyquery.find(f)
-    gen = pyquery.items()
-    data = []
-    for x in gen:
-        print(x)
-        pq = PyQuery(x)
-        txt = pq.text()
-        data.append(txt)
-    return data
-
-def min_price(list):
-    low = float(list[0])
-    for x in list:
-        if float(x) < low:
-            low = float(x)
-    return str(low)
-
-def generate_flight_info(deptimes, arrtimes, lfp, lfpp, sfp, dep_air, arr_air):
-    n = len(deptimes)
-    info = []
-    for i in range(0, n):
-        info.append(FlightInfo(deptimes[i], arrtimes[i], min_price([lfp[i], lfpp[i], sfp[i]]), dep_air, arr_air))
-    return info
-
+def values_from_html(base_query, filters):
+    c = base_query
+    for fil in filters:
+        c = c.find(fil)
+    l = []
+    for x in c:
+        new_query = PyQuery(x)
+        l.append(new_query.text())
+    return l
 
 if __name__ == "__main__":
     #with open("to_analyze.html", "r") as html_file:
         #_html = html_file.read().encode("UTF-8")
     url = construct_url(base_url, payload)
-    print(url)
+    #print(url)
     _html = download_html(url)
-    with open("temp.html", "w") as blah:
-        blah.write(_html)
     parser = PyQuery(_html).find("tbody")
 
-    #oddrow rowinfo1
-    parser_a = parser.find("tr.oddrow.rowinfo1")
-    deptimes = query_html_data(parser_a, ["td.depdest"])
-    arrtimes = query_html_data(parser_a, ["td.arrdest"])
-    lowfareprices = query_html_data(parser_a, ["td.fareselect.standardlowfare", "div.content", "label"])
-    lowfareplusprices = query_html_data(parser_a, ["td.fareselect.standardlowfareplus", "div.content", "label"])
-    standardflexprices = query_html_data(parser_a, ["td.fareselect.standardflex.endcell", "div.content", "label"])
-    
-    #oddrow rowinfo2 lastrow
-    parser_b = parser.find("tr.oddrow.rowinfo2.lastrow")
+    #oddrow1
+    parser_odd1 = parser.find("tr.oddrow.rowinfo1")
+    odd_departure_times = values_from_html(parser_odd1, ["td.depdest", "div.content.emphasize"])
+    odd_arrival_times = values_from_html(parser_odd1, ["td.arrdest", "div.content.emphasize"])
+    odd_price_lf = values_from_html(parser_odd1, ["td.fareselect.standardlowfare", "div.content"])
+    odd_price_lfp = values_from_html(parser_odd1, ["td.fareselect.standardlowfareplus", "div.content"])
+    odd_price_flx = values_from_html(parser_odd1, ["td.fareselect.standardflex.endcell", "div.content"])
+    #evenrow1
+    parser_even1 = parser.find("tr.evenrow.rowinfo1")
+    even_departure_times = values_from_html(parser_even1, ["td.depdest", "div.content.emphasize"])
+    even_arrival_times = values_from_html(parser_even1, ["td.arrdest", "div.content.emphasize"])
+    even_price_lf = values_from_html(parser_even1, ["td.fareselect.standardlowfare", "div.content"])
+    even_price_lfp = values_from_html(parser_even1, ["td.fareselect.standardlowfareplus", "div.content"])
+    even_price_flx = values_from_html(parser_even1, ["td.fareselect.standardflex.endcell", "div.content"])
 
-    dep_airport = query_html_data(parser_b, ["td.depdest", "div.content"])[0]
-    arr_airport = query_html_data(parser_b, ["td.arrdest", "div.content"])[0]
-
-    flightinfo = generate_flight_info(deptimes, arrtimes, lowfareprices, lowfareplusprices, standardflexprices, dep_airport, arr_airport)
-    for fi in flightinfo:
-        print(str(fi))
-    #print(deptimes)
-    #print(arrtimes)
-    #print(lowfareprices)
-    #print(lowfareplusprices)
-    #print(standardflexprices)
-    #parser_part1 = parser.find("td.depdest")
-    #print(parser_part1)
-    #tag = parser("td").filter(".depdest").text()
-    #print(tag)
-
-    #url = construct_url(base_url, payload)
-    #print(get_data(url))
+    #combine
+    deptimes = odd_departure_times + even_departure_times
+    arrtimes = odd_arrival_times + even_arrival_times
+    lowfare = odd_price_lf + even_price_lf
+    lowfareplus = odd_price_lfp + even_price_lfp
+    flex = odd_price_flx + even_price_flx
+    print(deptimes)
+    print(arrtimes)
+    print(lowfare)
+    print(lowfareplus)
+    print(flex)
