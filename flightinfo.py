@@ -10,4 +10,4 @@ class FlightInfo:
         self.taxes = taxes
     
     def __str__(self):
-        return self.departure_time + " " + self.arrival_time + " " + self.full_price + " " + self.taxes + " " + self.departure_port + " " + self.arrival_port
+        return self.flight_id + " {" + self.departure_time + " " + self.arrival_time + " " + self.full_price + " " + self.taxes + " " + self.departure_port + " " + self.arrival_port + "}"
