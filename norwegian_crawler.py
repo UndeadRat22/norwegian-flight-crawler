@@ -1,29 +1,10 @@
 import requests
-import re
+from re import findall as regex
 from pyquery import PyQuery
-from FlightInfo import FlightInfo
+from flightinfo import FlightInfo
 
 base_url = "https://www.norwegian.com/us/ipc/availability/avaday"
 
-'''
-POST /us/ipc/availability/avaday?
-D_City=OSL&
-A_City=RIX&
-TripType=1&
-D_Day=01&
-D_Month=201810&
-D_SelectedDay=01&
-R_Day=01&
-R_Month=201810&
-R_SelectedDay=01&
-dFlight=DY738OSLTRDDY1078TRDRIX&d
-CabinFareType=1&
-AgreementCodeFK=-1&
-CurrencyCode=USD&
-rnd=85501&
-processid=80276&
-mode=ab HTTP/1.1
-'''
 payload = {
     "D_City" : "OSL", #departure city
     "A_City" : "RIX", #arrival city
@@ -67,78 +48,51 @@ def download_html(url):
         return None
     return resp.content.decode("UTF-8")
 
-def values_from_html(base_query, filters):
-    c = base_query
-    for fil in filters:
-        c = c.find(fil)
-    l = []
-    for x in c:
-        new_query = PyQuery(x)
-        l.append(new_query.text())
-    return l
+def get_flight_ids(html_text):
+    __pq = PyQuery(html_text).find("tbody").find("td.inputselect").find("div.content").find("input")
+    ids = []
+    for __node in __pq.items():
+        if (__node.hasClass("radio-ajax")):
+            __matched = regex("[A-Z]{2}.*[A-Z]",str(__node.attr("value")))
+            ids.extend(__matched)
+    return ids
 
-def min_price(a, b, c):
-    a = float(a)
-    b = float(b)
-    c = float(c)
-    return str(min(min(a, b), c))
+def get_flight_info_by_id(id, html_text):
+    __pqbody = PyQuery(html_text).find("tbody")
+    __pqtable = PyQuery(html_text).find("div.selectioncontainer").find("table.selectiontable")
 
+    __pqrow1 = __pqbody.find("tr.selectedrow.rowinfo1")
+    __pqrow2 = __pqbody.find("tr.selectedrow.rowinfo2")
 
-def construct_flight_info(departure_times, arrival_times, lowfare, lowfareplus, flex, airport_d, airport_a):
-    info = []
-    n = len(departure_times)
-    for i in range(0, n):
-        price = min_price(lowfare[i], lowfareplus[i], flex[i])
-        mem = FlightInfo(departure_times[i], arrival_times[i], price, airport_d, airport_a)
-        info.append(mem)
-    return info
+    dep_time = __pqrow1.find("td.depdest").text()
+    arr_time = __pqrow1.find("td.arrdest").text()
+
+    dep_port = __pqrow2.find("td.depdest").text()
+    arr_port = __pqrow2.find("td.arrdest").text()
+
+    __pqprices = __pqtable.find("td.rightcell.emphasize")
+
+    full_price = __pqprices.eq(0).text()
+    tax_price = __pqprices.eq(1).text()
+
+    finfo = FlightInfo(id, dep_time, arr_time, full_price, tax_price, dep_port, arr_port)
+    
+    print(dep_time, arr_time, dep_port, arr_port, full_price, tax_price)
+
+    return finfo
 
 if __name__ == "__main__":
     url = construct_url(base_url, payload)
-    _html = download_html(url)
+    __html = download_html(url)
     
-    with open("with_flight_number", "w") as f:
-        f.write(_html)
+    #with open("with_flight_number.html", "w") as f:
+    #    f.write(_html)
 
     pageloads = []
-    if _html:
-        pageloads.append(url)
-    parser = PyQuery(_html).find("tbody")
+    if not __html:
+        exit()
+    
+    pageloads.append(url)
 
-    #oddrow1
-    parser_odd1 = parser.find("tr.oddrow.rowinfo1")
-    odd_departure_times = values_from_html(parser_odd1, ["td.depdest", "div.content.emphasize"])
-    odd_arrival_times = values_from_html(parser_odd1, ["td.arrdest", "div.content.emphasize"])
-    odd_price_lf = values_from_html(parser_odd1, ["td.fareselect.standardlowfare", "div.content"])
-    odd_price_lfp = values_from_html(parser_odd1, ["td.fareselect.standardlowfareplus", "div.content"])
-    odd_price_flx = values_from_html(parser_odd1, ["td.fareselect.standardflex.endcell", "div.content"])
-    #evenrow1
-    parser_even1 = parser.find("tr.evenrow.rowinfo1")
-    even_departure_times = values_from_html(parser_even1, ["td.depdest", "div.content.emphasize"])
-    even_arrival_times = values_from_html(parser_even1, ["td.arrdest", "div.content.emphasize"])
-    even_price_lf = values_from_html(parser_even1, ["td.fareselect.standardlowfare", "div.content"])
-    even_price_lfp = values_from_html(parser_even1, ["td.fareselect.standardlowfareplus", "div.content"])
-    even_price_flx = values_from_html(parser_even1, ["td.fareselect.standardflex.endcell", "div.content"])
-
-    #get airports
-    parser = parser.find("tr.oddrow.rowinfo2.lastrow")
-
-    airport_dept = parser.find("td.depdest").find("div.content").text()
-    airport_arrv = parser.find("td.arrdest").find("div.content").text()
-    #combine
-    deptimes = odd_departure_times + even_departure_times
-    arrtimes = odd_arrival_times + even_arrival_times
-    lowfare = odd_price_lf + even_price_lf
-    lowfareplus = odd_price_lfp + even_price_lfp
-    flex = odd_price_flx + even_price_flx
-    print(deptimes)
-    print(arrtimes)
-    print(lowfare)
-    print(lowfareplus)
-    print(flex)
-    print(airport_dept)
-    print(airport_arrv)
-
-    info = construct_flight_info(deptimes, arrtimes, lowfare, lowfareplus, flex, airport_dept, airport_arrv)
-    for flight in info:
-        print(str(flight))
+    flight_ids = get_flight_ids(__html)
+    get_flight_info_by_id(flight_ids[0], __html)
