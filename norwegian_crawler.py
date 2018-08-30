@@ -42,10 +42,10 @@ def construct_url(url, payload):
 def download_html(url):
     headers = requests.utils.default_headers()
     headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36"})
-    resp = requests.get(url)
-    if resp.status_code != 200:
-        return None
-    return resp.content.decode("UTF-8")
+    with requests.get(url) as resp:
+        if resp.status_code != 200:
+            return None
+        return resp.content.decode("UTF-8")
 
 def get_flight_ids(html_text):
     __pq = PyQuery(html_text).find("tbody").find("td.inputselect").find("div.content").find("input")
